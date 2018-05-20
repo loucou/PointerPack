@@ -35,6 +35,7 @@ public:
         _buffer = new uint8_t[size];
         for( size_t i = 0; i < size; i++ )
             _buffer[i] = other._buffer[i];
+        return *this;
     }
 
     PointerPack& operator=(PointerPack&& other)
@@ -42,6 +43,7 @@ public:
         delete[] _buffer;
         _buffer = other._buffer;
         other._buffer = nullptr;
+        return *this;
     }
 
     ~PointerPack()
@@ -163,8 +165,11 @@ public:
         if( !_buffer )
             return 0;
 
+        uint8_t PointerBits = CHAR_BIT * sizeof(T*);
         uint8_t numZeroBits = _buffer[0];
         uint8_t numSharedBits = _buffer[1];
+        uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
+        uint8_t numSpecificBits = PointerBits - numSharedBits;
 
         size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
         size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;

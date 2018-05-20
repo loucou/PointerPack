@@ -14,6 +14,8 @@ int main()
 
     pack.Set(1, (float*) 0b101'010);
 
+    std::cout << "size: " << pack.AllocatedSize() << std::endl;
+
     for( size_t i = 0; i < 4; i++ )
     {
         float* p = pack.Get(i);
@@ -23,4 +25,10 @@ int main()
         std::cout << std::endl;
     }
 
+    PointerPack<float, 4> pack2(pack);
+    float* p = pack.Get(0);
+    std::cout << (uint64_t) ptr[0] << " -> " << (uint64_t) p;
+    if( p != ptr[0] )
+        std::cout << " !!!";
+    std::cout << std::endl;
 }
