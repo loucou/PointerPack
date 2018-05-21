@@ -111,7 +111,7 @@ public:
 
         _buffer[0] = numZeroBits;
 
-        _buffer[1] = numSharedBits;
+        _buffer[1] = numSpecificBits;
 
         size_t writeOffset = 2 * CHAR_BIT;
 
@@ -138,9 +138,9 @@ public:
 
         uint8_t PointerBits = CHAR_BIT * sizeof(T*);
         uint8_t numZeroBits = _buffer[0];
-        uint8_t numSharedBits = _buffer[1];
+        uint8_t numSpecificBits = _buffer[1];
+        uint8_t numSharedBits = PointerBits - numSpecificBits;
         uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        uint8_t numSpecificBits = PointerBits - numSharedBits;
 
         uintptr_t res = 0u;
 
@@ -167,9 +167,9 @@ public:
 
         uint8_t PointerBits = CHAR_BIT * sizeof(T*);
         uint8_t numZeroBits = _buffer[0];
-        uint8_t numSharedBits = _buffer[1];
+        uint8_t numSpecificBits= _buffer[1];
+        uint8_t numSharedBits = PointerBits - numSpecificBits;
         uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        uint8_t numSpecificBits = PointerBits - numSharedBits;
 
         size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
         size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;
