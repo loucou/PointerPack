@@ -42,17 +42,17 @@ void testPointerPack()
 void testSVOPointerPack()
 {
     float* ptr[8] = {
-        (float*) 0b101'001,
-        (float*) 0b101'100,
-        (float*) 0b101'100,
-        (float*) 0b101'001
+        (float*) 0b101'00,
+        (float*) 0b101'01,
+        (float*) 0b101'10,
+        (float*) 0b101'11
     };
 
     SVOPointerPack<float, 4> pack(ptr);
 
-    pack.Set(1, (float*) 0b101'010);
+    pack.Set(1, (float*) 0b101'11);
 
-    std::cout << "size: " << pack.AllocatedSize() << std::endl;
+    //std::cout << "size: " << pack.AllocatedSize() << std::endl; // TODO: implement
 
     for( size_t i = 0; i < 4; i++ )
     {
@@ -63,16 +63,17 @@ void testSVOPointerPack()
         std::cout << std::endl;
     }
 
-    SVOPointerPack<float, 4> pack2(pack);
-    float* p = pack.Get(0);
-    std::cout << (uint64_t) ptr[0] << " -> " << (uint64_t) p;
-    if( p != ptr[0] )
-        std::cout << " !!!";
-    std::cout << std::endl;
+    // TODO: implement copy
+    //SVOPointerPack<float, 4> pack2(pack);
+    //float* p = pack.Get(0);
+    //std::cout << (uint64_t) ptr[0] << " -> " << (uint64_t) p;
+    //if( p != ptr[0] )
+    //    std::cout << " !!!";
+    //std::cout << std::endl;
 }
 
 int main()
 {
-    //testPointerPack();
+    testPointerPack();
     testSVOPointerPack();
 }
