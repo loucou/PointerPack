@@ -1,19 +1,18 @@
 #pragma once
 
 #include <cstdint>
-#include <climits>
 
 template<typename T, size_t N>
 class SVOPointerPack
 {
+    constexpr static uint8_t kBitsPerByte = 8u;
+    constexpr static uint8_t kBytesPerPointer = sizeof(void*);
+    constexpr static uint8_t kBitsPerPointer = kBitsPerByte * kBytesPerPointer;
+
 public:
     SVOPointerPack(T** const pointerArray = nullptr)
-        : _buffer{ 0u, 0u }
+        : _buffer{ 0u, (uintptr_t) nullptr }
     {
-        static_assert(CHAR_BIT == 8, "Expecting 8 bits words");
-        static_assert(sizeof(uint8_t) == 1, "Expecting 1 word for uint8_t");
-        static_assert(sizeof(T*) == sizeof(uintptr_t), "Expecting uintptr_t and void* to be the same size");
-        static_assert(sizeof(T*) * CHAR_BIT < UCHAR_MAX, "Limitation on pointer size");
         Set(pointerArray);
     }
 
@@ -30,13 +29,26 @@ public:
 
     SVOPointerPack& operator=(const SVOPointerPack& other)
     {
-        //delete[] _buffer;
-        //size_t size = other.AllocatedSize();
-        //_buffer = new uint8_t[size];
-        //for( size_t i = 0; i < size; i++ )
-        //    _buffer[i] = other._buffer[i];
-        //return *this;
-        throw std::exception("not implemented");
+        Clear(); // TODO: reuse allocated buffer if possible
+        
+        uint8_t* buf = (uint8_t*) _buffer;
+        const uint8_t* otherbuf = (const uint8_t*) other._buffer;
+        
+        uint8_t numZeroBits, numSpecificBits, numSharedNonZeroBits;
+        size_t numBytes = 0u;
+        info(otherbuf, numZeroBits, numSpecificBits, numSharedNonZeroBits, numBytes);
+        bool usesHeap = numBytes > 2 * sizeof(uintptr_t);
+
+        if( usesHeap )
+        {
+            size_t nAllocBytes = numBytes - sizeof(uintptr_t);
+            _buffer[1] = (uintptr_t) new uint8_t[nAllocBytes];
+            std::memcpy((void*) _buffer[1], (const void*) other._buffer[1], nAllocBytes);
+        }
+
+        _buffer[0] = other._buffer[0];
+
+        return *this;
     }
 
     SVOPointerPack& operator=(SVOPointerPack&& other)
@@ -52,13 +64,13 @@ public:
     {
         uint8_t* buf = (uint8_t*) _buffer;
 
-        uint8_t PointerBits = CHAR_BIT * sizeof(T*);
+        
         uint8_t numZeroBits = buf[0];
         uint8_t numSpecificBits = buf[1];
-        uint8_t numSharedBits = PointerBits - numSpecificBits;
+        uint8_t numSharedBits = kBitsPerPointer - numSpecificBits;
         uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
-        size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;
+        size_t numBits = 2 * kBitsPerByte + numSharedNonZeroBits + N * numSpecificBits;
+        size_t numBytes = (numBits + (kBitsPerByte - 1)) / kBitsPerByte;
 
         bool usesHeap = numBytes > N * sizeof(T*);
 
@@ -91,11 +103,10 @@ public:
 
         uintptr_t* ptrs = (uintptr_t*) pointerArray;
 
-        uint8_t PointerBits = CHAR_BIT * sizeof(T*);
         uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        uint8_t numSpecificBits = PointerBits - numSharedBits;
-        size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
-        size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;
+        uint8_t numSpecificBits = kBitsPerPointer - numSharedBits;
+        size_t numBits = 2 * kBitsPerByte + numSharedNonZeroBits + N * numSpecificBits;
+        size_t numBytes = (numBits + (kBitsPerByte - 1)) / kBitsPerByte;
 
         bool usesHeap = numBytes > 2 * sizeof(uintptr_t);
 
@@ -108,7 +119,7 @@ public:
 
         buf[1] = numSpecificBits;
 
-        size_t writeOffset = 2 * CHAR_BIT;
+        size_t writeOffset = 2 * kBitsPerByte;
 
         for( size_t b = 0; b < numSharedNonZeroBits; b++ )
         {
@@ -130,16 +141,15 @@ public:
     {
         uint8_t* buf = (uint8_t*) _buffer;
 
-        uint8_t PointerBits = CHAR_BIT * sizeof(T*);
         uint8_t numZeroBits = buf[0];
-        if( numZeroBits == PointerBits )
+        if( numZeroBits == kBitsPerPointer )
             return nullptr;
 
         uint8_t numSpecificBits = buf[1];
-        uint8_t numSharedBits = PointerBits - numSpecificBits;
+        uint8_t numSharedBits = kBitsPerPointer - numSpecificBits;
         uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
-        size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;
+        size_t numBits = 2 * kBitsPerByte + numSharedNonZeroBits + N * numSpecificBits;
+        size_t numBytes = (numBits + (kBitsPerByte - 1)) / kBitsPerByte;
 
         bool usesHeap = numBytes > 2 * sizeof(uintptr_t);
 
@@ -147,13 +157,13 @@ public:
 
         for( size_t b = 0; b < numSharedNonZeroBits; b++ )
         {
-            uint8_t bitValue = readBitFromSVOBuffer(usesHeap, 2 * CHAR_BIT + b);
+            uint8_t bitValue = readBitFromSVOBuffer(usesHeap, 2 * kBitsPerByte + b);
             writeBit((uint8_t*) &res, numSpecificBits + b, bitValue);
         }
 
         for( size_t b = 0; b < numSpecificBits; b++ )
         {
-            size_t readOffset = 2 * CHAR_BIT + numSharedNonZeroBits + index * numSpecificBits + b;
+            size_t readOffset = 2 * kBitsPerByte + numSharedNonZeroBits + index * numSpecificBits + b;
             uint8_t bitValue = readBitFromSVOBuffer(usesHeap, readOffset);
             writeBit((uint8_t*) &res, b, bitValue);
         }
@@ -165,43 +175,20 @@ public:
     {
         uint8_t* buf = (uint8_t*) _buffer;
 
-        uint8_t PointerBits = CHAR_BIT * sizeof(T*);
-        uint8_t numZeroBits = buf[0];
-        uint8_t numSpecificBits = buf[1];
-        uint8_t numSharedBits = PointerBits - numSpecificBits;
-        uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
-        size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;
-
+        uint8_t numZeroBits, numSpecificBits, numSharedNonZeroBits;
+        size_t numBytes = 0u;
+        info(buf, numZeroBits, numSpecificBits, numSharedNonZeroBits, numBytes);
         bool usesHeap = numBytes > 2 * sizeof(uintptr_t);
 
-        if( usesHeap ) {
+        if( usesHeap )
+        {
             uint8_t* heapbuf = (uint8_t*) _buffer[1];
             delete[] heapbuf;
         }
 
-        _buffer[0] = 0u;
-        _buffer[1] = 0u;
-        buf[0] = PointerBits;
+        buf[0] = kBitsPerPointer;
         buf[1] = 0;
-    }
-
-    size_t AllocatedSize() const
-    {
-        //if( !_buffer )
-        //    return 0;
-
-        //uint8_t PointerBits = CHAR_BIT * sizeof(T*);
-        //uint8_t numZeroBits = _buffer[0];
-        //uint8_t numSharedBits = _buffer[1];
-        //uint8_t numSharedNonZeroBits = numSharedBits - numZeroBits;
-        //uint8_t numSpecificBits = PointerBits - numSharedBits;
-
-        //size_t numBits = 2 * CHAR_BIT + numSharedNonZeroBits + N * numSpecificBits;
-        //size_t numBytes = (numBits + (CHAR_BIT - 1)) / CHAR_BIT;
-
-        //return numBytes;
-        throw std::exception("not implemented");
+        _buffer[1] = (uintptr_t) nullptr;
     }
 
 private:
@@ -220,20 +207,28 @@ private:
             diff |= (ref ^ ptrs[i]); // each bit is 1 where ref and ptrs[i] differ
         }
 
-        uint8_t PointerBits = CHAR_BIT * sizeof(T*);
-
-        numZeroBits = PointerBits;
+        numZeroBits = kBitsPerPointer;
         for( ; ones; ones >>= 1u )
             numZeroBits--;
 
-        numSharedBits = PointerBits;
+        numSharedBits = kBitsPerPointer;
         for( ; diff; diff >>= 1u )
             numSharedBits--;
     }
 
+    static void info(const uint8_t* buffer, uint8_t& numZeroBits, uint8_t& numSpecificBits, uint8_t& numSharedNonZeroBits, size_t numBytes)
+    {
+        numZeroBits = buffer[0];
+        numSpecificBits = buffer[1];
+        uint8_t numSharedBits = kBitsPerPointer - numSpecificBits;
+        numSharedNonZeroBits = numSharedBits - numZeroBits;
+        size_t numBits = 2 * kBitsPerByte + numSharedNonZeroBits + N * numSpecificBits;
+        numBytes = (numBits + (kBitsPerByte - 1)) / kBitsPerByte;
+    }
+
     const uint8_t* const getSVOBuffer(bool usesHeap, size_t bitIndex) const
     {
-        const uint8_t* pbuffer = ( usesHeap && bitIndex >= sizeof(T*) * CHAR_BIT ) 
+        const uint8_t* pbuffer = ( usesHeap && bitIndex >= kBitsPerPointer ) 
             ? (const uint8_t*) _buffer[1] 
             : (const uint8_t*) &_buffer;
         return pbuffer;
@@ -253,15 +248,15 @@ private:
 
     static uint8_t readBit(const uint8_t* const buffer, size_t bitIndex)
     {
-        size_t byteIndex = bitIndex / CHAR_BIT;
-        size_t bitOffset = bitIndex % CHAR_BIT;
+        size_t byteIndex = bitIndex / kBitsPerByte;
+        size_t bitOffset = bitIndex % kBitsPerByte;
         return (buffer[byteIndex] >> bitOffset) & 1u;
     }
 
     static void writeBit(uint8_t* const buffer, size_t bitIndex, uint8_t bitValue)
     {
-        size_t byteIndex = bitIndex / CHAR_BIT;
-        size_t bitOffset = bitIndex % CHAR_BIT;
+        size_t byteIndex = bitIndex / kBitsPerByte;
+        size_t bitOffset = bitIndex % kBitsPerByte;
 
         uint8_t mask = ~(1u << bitOffset);
         buffer[byteIndex] &= mask;

@@ -2,14 +2,17 @@
 #include "SVOPointerPack.h"
 #include <iostream>
 
-void check()
+template<typename PackType>
+void check(const PackType& pack, void** ref, size_t n)
 {
-    //TODO
+    for( size_t i = 0; i < n; i++ )
+        if( pack.Get(i) != ref[i] )
+            throw std::exception("Pointer check error");
 }
 
 void testPointerPack()
 {
-    float* ptr[8] = {
+    float* ptr[4] = {
         (float*) 0b101'001,
         (float*) 0b101'100,
         (float*) 0b101'100,
@@ -18,62 +21,58 @@ void testPointerPack()
 
     PointerPack<float, 4> pack(ptr);
 
+    check(pack, (void**) ptr, 4);
+
     pack.Set(1, (float*) 0b101'010);
-
-    std::cout << "size: " << pack.AllocatedSize() << std::endl;
-
-    for( size_t i = 0; i < 4; i++ )
-    {
-        float* p = pack.Get(i);
-        std::cout << (uint64_t) ptr[i] << " -> " << (uint64_t) p;
-        if( p != ptr[i] )
-            std::cout << " !!!";
-        std::cout << std::endl;
-    }
+    ptr[1] = (float*) 0b101'010;
+    
+    check(pack, (void**) ptr, 4);
 
     PointerPack<float, 4> pack2(pack);
-    float* p = pack.Get(0);
-    std::cout << (uint64_t) ptr[0] << " -> " << (uint64_t) p;
-    if( p != ptr[0] )
-        std::cout << " !!!";
-    std::cout << std::endl;
+
+    check(pack, (void**) ptr, 4);
+    check(pack2, (void**) ptr, 4);
 }
 
 void testSVOPointerPack()
 {
-    float* ptr[8] = {
-        (float*) 0b101'00,
-        (float*) 0b101'01,
-        (float*) 0b101'10,
-        (float*) 0b101'11
+    float* ptr[4] = {
+        (float*) 0b101'001,
+        (float*) 0b101'100,
+        (float*) 0b101'100,
+        (float*) 0b101'001
     };
 
     SVOPointerPack<float, 4> pack(ptr);
 
-    pack.Set(1, (float*) 0b101'11);
+    check(pack, (void**) ptr, 4);
 
-    //std::cout << "size: " << pack.AllocatedSize() << std::endl; // TODO: implement
+    pack.Set(1, (float*) 0b101'010);
+    ptr[1] = (float*) 0b101'010;
 
-    for( size_t i = 0; i < 4; i++ )
-    {
-        float* p = pack.Get(i);
-        std::cout << (uint64_t) ptr[i] << " -> " << (uint64_t) p;
-        if( p != ptr[i] )
-            std::cout << " !!!";
-        std::cout << std::endl;
-    }
+    check(pack, (void**) ptr, 4);
 
-    // TODO: implement copy
-    //SVOPointerPack<float, 4> pack2(pack);
-    //float* p = pack.Get(0);
-    //std::cout << (uint64_t) ptr[0] << " -> " << (uint64_t) p;
-    //if( p != ptr[0] )
-    //    std::cout << " !!!";
-    //std::cout << std::endl;
+    SVOPointerPack<float, 4> pack2(pack);
+
+    check(pack, (void**) ptr, 4);
+    check(pack2, (void**) ptr, 4);
 }
 
 int main()
 {
-    testPointerPack();
-    testSVOPointerPack();
+    bool success = true;
+
+    try
+    {
+        testPointerPack();
+        testSVOPointerPack();
+    }
+    catch( const std::exception& e )
+    {
+        success = false;
+        std::cout << "Error: " << e.what() << std::endl;
+    }
+
+    if( success )
+        std::cout << "All tests OK" << std::endl;     
 }
